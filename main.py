@@ -113,7 +113,6 @@ model = MOMENTPipeline.from_pretrained(
 )
 model.init()
 model = model.to(device)
-initialHeadWeights = model.head.linear.weight.data.clone()
 
 # DISPLAY TRAINABLE PARAMETERS
 totalParams = sum(p.numel() for p in model.parameters())
@@ -192,9 +191,6 @@ for epoch in range(max_epochs):
     if valF1 > bestValF1:
         bestValF1 = valF1
         torch.save(model.state_dict(), Path(f"models/MOMENT_{instrument}_{granularity}_{yearNow}.pt"))
-
-headWeightsChanged = not torch.equal(initialHeadWeights, model.head.linear.weight.data)
-print(f"Head weights changed: {headWeightsChanged}")
 
 # EVALUATION
 bestState = torch.load(Path(f"models/MOMENT_{instrument}_{granularity}_{yearNow}.pt"), map_location=device)
