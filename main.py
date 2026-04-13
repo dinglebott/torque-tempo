@@ -21,7 +21,8 @@ warnings.filterwarnings("ignore", message=".*None of the inputs have requires_gr
 # HYPERPARAMETERS
 batch_size = 32
 max_epochs = 10
-learning_rate = 1e-4
+learning_rate = 1e-5
+numBlocksTrain = 3
 train_split = 0.8
 val_split = 0.1
 
@@ -50,7 +51,12 @@ featureList = [
     "rsi_14", "macd_hist", "vol_ratio", "vol_momentum", "adx_direction",
     "dist_high", "dist_low"
 ]
-featureList = ["open_return", "high_return", "low_return", "close_return", "vol_return"]
+featureList = [
+    "adx_direction", "macd_hist", "dist_high", "dist_low",
+    "close_return", "high_return", "low_return", "vol_return",
+    "atr_14", "hl_spread",
+    "rsi_14", "dist_ema15", "vol_momentum"
+]
 
 # SPLIT DATA
 X = df[featureList]
@@ -107,12 +113,18 @@ model = MOMENTPipeline.from_pretrained(
         "n_channels": X_train.shape[1],
         "num_class": 3,
         "freeze_encoder": True, # freeze embedding layer
-        "freeze_embedder": True, # freeze transformer blocks
+        "freeze_embedder": False, # train (some) transformer blocks
         "freeze_head": False # train classification head
     }
 )
 model.init()
 model = model.to(device)
+
+# SELECTIVELY REFREEZE TRANSFORMER
+for i, block in enumerate(model.encoder.block):
+    freeze = i < (len(model.encoder.block) - numBlocksTrain)
+    for param in block.parameters():
+        param.requires_grad = not freeze
 
 # DISPLAY TRAINABLE PARAMETERS
 totalParams = sum(p.numel() for p in model.parameters())
@@ -147,10 +159,8 @@ for epoch in range(max_epochs):
         X_batch, y_batch = X_batch.to(device), y_batch.to(device)
         # train
         optimiser.zero_grad() # clear gradients
-        with torch.no_grad():
-            output = model(x_enc=X_batch)
-        embeddings = output.embeddings.detach() # stop gradient flow into encoder
-        logits = model.head(embeddings)
+        output = model(x_enc=X_batch)
+        logits = model.head(output.embeddings)
         loss = criterion(logits, y_batch)
         # backpropagation
         loss.backward()
@@ -175,8 +185,7 @@ for epoch in range(max_epochs):
         # infer
         with torch.no_grad():
             valOutput = model(x_enc=X_batch_val)
-            valEmbeddings = valOutput.embeddings
-            valLogits = model.head(valEmbeddings)
+            valLogits = model.head(valOutput.embeddings)
             valLoss = criterion(valLogits, y_batch_val)
         # record
         valLosses.append(valLoss.item())
@@ -202,8 +211,7 @@ for X_batch_test, y_batch_test in tqdm(testLoader, desc="TEST"):
     X_batch_test, y_batch_test = X_batch_test.to(device), y_batch_test.to(device)
     with torch.no_grad():
         testOutput = model(x_enc=X_batch_test)
-        testEmbeddings = testOutput.embeddings
-        testLogits = model.head(testEmbeddings)
+        testLogits = model.head(testOutput.embeddings)
         testLoss = criterion(testLogits, y_batch_test)
     testLosses.append(testLoss.item())
     testPreds.extend(testLogits.argmax(dim=1).cpu().numpy())
