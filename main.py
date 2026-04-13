@@ -21,7 +21,7 @@ warnings.filterwarnings("ignore", message=".*None of the inputs have requires_gr
 # HYPERPARAMETERS
 batch_size = 32
 max_epochs = 10
-learning_rate = 1e-5
+learning_rate = 5e-6
 numBlocksTrain = 3
 train_split = 0.8
 val_split = 0.1
@@ -55,7 +55,7 @@ featureList = [
     "adx_direction", "macd_hist", "dist_high", "dist_low",
     "close_return", "high_return", "low_return", "vol_return",
     "atr_14", "hl_spread",
-    "rsi_14", "dist_ema15", "vol_momentum"
+    "rsi_14", "dist_ema15", "ema_cross"
 ]
 
 # SPLIT DATA
