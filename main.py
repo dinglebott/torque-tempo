@@ -6,7 +6,7 @@ from sklearn.preprocessing import StandardScaler
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import OneCycleLR
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.metrics import f1_score, roc_auc_score, confusion_matrix, classification_report
 from momentfm import MOMENTPipeline
 from tqdm import tqdm
@@ -20,9 +20,9 @@ warnings.filterwarnings("ignore", message=".*None of the inputs have requires_gr
 
 # HYPERPARAMETERS
 batch_size = 32
-max_epochs = 10
-learning_rate = 5e-6
-numBlocksTrain = 3
+max_epochs = 80
+learning_rate = 2e-5
+numBlocksTrain = 1
 train_split = 0.8
 val_split = 0.1
 
@@ -52,10 +52,10 @@ featureList = [
     "dist_high", "dist_low"
 ]
 featureList = [
-    "adx_direction", "macd_hist", "dist_high", "dist_low",
-    "close_return", "high_return", "low_return", "vol_return",
-    "atr_14", "hl_spread",
-    "rsi_14", "dist_ema15", "ema_cross"
+    "high_return", "low_return", "adx_direction", "ema_cross", "bb_position",
+    "macd_hist", "upper_wick", "lower_wick", "dist_high", "dist_low",
+    "dist_ema15", "rsi_14", "volatility_regime", "bb_width", "atr_14",
+    "vol_ratio", "vol_momentum", "smooth_return", "dist_smooth"
 ]
 
 # SPLIT DATA
@@ -142,15 +142,17 @@ weightsTensor = torch.tensor(weights, dtype=torch.float32).to(device)
 criterion = torch.nn.CrossEntropyLoss(weight=weightsTensor)
 optimiser = AdamW(
     filter(lambda p: p.requires_grad, model.parameters()),
-    lr=learning_rate
+    lr=learning_rate,
+    weight_decay=1e-5
 )
 totalSteps = len(trainLoader) * max_epochs
-scheduler = OneCycleLR(optimiser, max_lr=learning_rate, total_steps=totalSteps, pct_start=0.3)
+scheduler = ReduceLROnPlateau(optimiser, mode="max", factor=0.5, patience=2, min_lr=1e-6)
 
 # TRAINING LOOP
 bestValF1 = 0.0
 
 for epoch in range(max_epochs):
+    print() # line break
     # epoch loop
     trainLosses, trainPreds = [], []
     model.train()
@@ -167,7 +169,6 @@ for epoch in range(max_epochs):
         
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
         optimiser.step()
-        scheduler.step()
         # record training metrics
         trainLosses.append(loss.item())
         trainPreds.extend(logits.argmax(dim=1).cpu().numpy())
@@ -191,10 +192,15 @@ for epoch in range(max_epochs):
         valLosses.append(valLoss.item())
         valPreds.extend(valLogits.argmax(dim=1).cpu().numpy())
     
-    # compile epoch validation metrics
+    # compile epoch validation metrics and LR
     avgValLoss = np.mean(valLosses)
     valF1 = f1_score(y_val[511:], valPreds, average="macro", zero_division=0)
+    currentLr = optimiser.param_groups[0]["lr"]
     print(f"Epoch {epoch + 1} | Loss: {avgValLoss:.4f} | Train loss: {avgTrainLoss:.4f} | F1: {valF1:.4f} | Train F1: {trainF1:.4f}")
+    print(f"LR: {currentLr:.2e}")
+
+    # step scheduler
+    scheduler.step(valF1)
 
     # save checkpoint
     if valF1 > bestValF1:
