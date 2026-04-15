@@ -20,8 +20,8 @@ warnings.filterwarnings("ignore", message=".*None of the inputs have requires_gr
 
 # HYPERPARAMETERS
 model_size = "base"
-batch_size = 32
-max_epochs = 80
+batch_size = 64
+max_epochs = 50
 learning_rate = 1e-5
 lr_scheduler_patience = 5
 num_blocks_train = 3
@@ -38,7 +38,7 @@ yearNow, instrument, granularity, forecastHorizon = globalVars.values()
 torch.manual_seed(42)
 np.random.seed(42)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Using device: {device}")
+print(f"\nUsing device: {device}")
 
 # LOAD DATA
 df = dataparser.parseData(f"json_data/{instrument}_{granularity}_{yearNow - 21}-01-01_{yearNow}-04-01.json")
@@ -132,8 +132,8 @@ for i, block in enumerate(model.encoder.block):
 # DISPLAY TRAINABLE PARAMETERS
 totalParams = sum(p.numel() for p in model.parameters())
 trainableParams = sum(p.numel() for p in model.parameters() if p.requires_grad)
-print(f"Total parameters: {totalParams}")
-print(f"Trainable parameters: {trainableParams}")
+print(f"Total parameters: {totalParams:,}")
+print(f"Trainable parameters: {trainableParams:,}")
 
 # CLASS WEIGHTING
 counts = np.bincount(y_train, minlength=3).astype(np.float32)
