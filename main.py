@@ -19,10 +19,13 @@ warnings.filterwarnings("ignore", message=".*use_reentrant.*")
 warnings.filterwarnings("ignore", message=".*None of the inputs have requires_grad.*")
 
 # HYPERPARAMETERS
+model_size = "base"
 batch_size = 32
 max_epochs = 80
-learning_rate = 2e-5
-numBlocksTrain = 1
+learning_rate = 1e-5
+lr_scheduler_patience = 5
+num_blocks_train = 3
+class_weight_coeff = 1.1
 train_split = 0.8
 val_split = 0.1
 
@@ -54,8 +57,8 @@ featureList = [
 featureList = [
     "high_return", "low_return", "adx_direction", "ema_cross", "bb_position",
     "macd_hist", "upper_wick", "lower_wick", "dist_high", "dist_low",
-    "dist_ema15", "rsi_14", "volatility_regime", "bb_width", "atr_14",
-    "vol_ratio", "vol_momentum", "smooth_return", "dist_smooth"
+    "dist_ema15", "dist_ema50", "rsi_14", "volatility_regime", "bb_width", "atr_14",
+    "vol_ratio", "smooth_return", "dist_smooth"
 ]
 
 # SPLIT DATA
@@ -107,7 +110,7 @@ testLoader = DataLoader(testData, batch_size=batch_size, shuffle=False)
 
 # LOAD MOMENT MODEL
 model = MOMENTPipeline.from_pretrained(
-    "AutonLab/MOMENT-1-small",
+    f"AutonLab/MOMENT-1-{model_size}",
     model_kwargs={
         "task_name": "classification",
         "n_channels": X_train.shape[1],
@@ -122,7 +125,7 @@ model = model.to(device)
 
 # SELECTIVELY REFREEZE TRANSFORMER
 for i, block in enumerate(model.encoder.block):
-    freeze = i < (len(model.encoder.block) - numBlocksTrain)
+    freeze = i < (len(model.encoder.block) - num_blocks_train)
     for param in block.parameters():
         param.requires_grad = not freeze
 
@@ -136,6 +139,7 @@ print(f"Trainable parameters: {trainableParams}")
 counts = np.bincount(y_train, minlength=3).astype(np.float32)
 weights = 1.0 / (counts + 1e-6)
 weights = weights / weights.sum() * 3 # normalise
+weights *= np.array([class_weight_coeff, 1.0, class_weight_coeff])
 weightsTensor = torch.tensor(weights, dtype=torch.float32).to(device)
 
 # LOSS, OPTIMISER, SCHEDULER
@@ -145,8 +149,7 @@ optimiser = AdamW(
     lr=learning_rate,
     weight_decay=1e-5
 )
-totalSteps = len(trainLoader) * max_epochs
-scheduler = ReduceLROnPlateau(optimiser, mode="max", factor=0.5, patience=2, min_lr=1e-6)
+scheduler = ReduceLROnPlateau(optimiser, mode="max", factor=0.5, patience=lr_scheduler_patience, min_lr=1e-7)
 
 # TRAINING LOOP
 bestValF1 = 0.0
@@ -154,7 +157,7 @@ bestValF1 = 0.0
 for epoch in range(max_epochs):
     print() # line break
     # epoch loop
-    trainLosses, trainPreds = [], []
+    trainLosses, trainPreds, trainLabels = [], [], []
     model.train()
     for X_batch, y_batch in tqdm(trainLoader, desc="TRAIN"):
         # cast to gpu
@@ -172,14 +175,15 @@ for epoch in range(max_epochs):
         # record training metrics
         trainLosses.append(loss.item())
         trainPreds.extend(logits.argmax(dim=1).cpu().numpy())
+        trainLabels.extend(y_batch.cpu().numpy())
     
     # compile epoch training metrics
     avgTrainLoss = np.mean(trainLosses)
-    trainF1 = f1_score(y_train[511:], trainPreds, average="macro", zero_division=0)
+    trainF1 = f1_score(trainLabels, trainPreds, average="macro", zero_division=0)
     
     # validation
     model.eval()
-    valLosses, valPreds = [], []
+    valLosses, valPreds, valLabels = [], [], []
     for X_batch_val, y_batch_val in tqdm(valLoader, desc="VAL"):
         # cast to gpu
         X_batch_val, y_batch_val = X_batch_val.to(device), y_batch_val.to(device)
@@ -191,10 +195,11 @@ for epoch in range(max_epochs):
         # record
         valLosses.append(valLoss.item())
         valPreds.extend(valLogits.argmax(dim=1).cpu().numpy())
+        valLabels.extend(y_batch_val.cpu().numpy())
     
     # compile epoch validation metrics and LR
     avgValLoss = np.mean(valLosses)
-    valF1 = f1_score(y_val[511:], valPreds, average="macro", zero_division=0)
+    valF1 = f1_score(valLabels, valPreds, average="macro", zero_division=0)
     currentLr = optimiser.param_groups[0]["lr"]
     print(f"Epoch {epoch + 1} | Loss: {avgValLoss:.4f} | Train loss: {avgTrainLoss:.4f} | F1: {valF1:.4f} | Train F1: {trainF1:.4f}")
     print(f"LR: {currentLr:.2e}")
@@ -212,7 +217,7 @@ bestState = torch.load(Path(f"models/MOMENT_{instrument}_{granularity}_{yearNow}
 model.load_state_dict(bestState)
 
 model.eval()
-testLosses, testPreds, testProbs = [], [], []
+testLosses, testPreds, testProbs, testLabels = [], [], [], []
 for X_batch_test, y_batch_test in tqdm(testLoader, desc="TEST"):
     X_batch_test, y_batch_test = X_batch_test.to(device), y_batch_test.to(device)
     with torch.no_grad():
@@ -222,16 +227,17 @@ for X_batch_test, y_batch_test in tqdm(testLoader, desc="TEST"):
     testLosses.append(testLoss.item())
     testPreds.extend(testLogits.argmax(dim=1).cpu().numpy())
     testProbs.extend(testLogits.softmax(dim=1).cpu().numpy())
+    testLabels.extend(y_batch_test.cpu().numpy())
 
 avgTestLoss = np.mean(testLosses)
-testF1 = f1_score(y_test[511:], testPreds, average="macro", zero_division=0)
-rocAucScore = roc_auc_score(y_test[511:], testProbs, multi_class="ovr", average="macro")
-cmatrix = confusion_matrix(y_test[511:], testPreds)
+testF1 = f1_score(testLabels, testPreds, average="macro", zero_division=0)
+rocAucScore = roc_auc_score(testLabels, testProbs, multi_class="ovr", average="macro")
+cmatrix = confusion_matrix(testLabels, testPreds)
 cmatrixDf = pd.DataFrame(cmatrix, index=["Real -", "Real ~", "Real +"], columns=["Pred -", "Pred ~", "Pred +"])
 cmatrixDf["Count"] = cmatrixDf.sum(axis=1)
 cmatrixDf.loc["Count"] = cmatrixDf.sum(axis=0)
 testReport = classification_report(
-    y_test[511:], testPreds,
+    testLabels, testPreds,
     target_names=["DOWN", "FLAT", "UP"],
     zero_division=0
 )
