@@ -20,9 +20,6 @@ High return => ln(H / previous C)\
 Low return => ln(L / previous C)\
 Close return => ln(C / previous C)\
 Volume return => ln(V / previous V)\
-Smooth return => ln(smoothed C / previous smoothed C)\
-Dist smooth => ln(C / smoothed C)\
-*Volume and smoothed C have been smoothed by Ehler's UltimateSmoother algorithm*\
 **Structure:**\
 High-low spread => ln(H - L)\
 Open-close spread => ln(C - O)\
@@ -32,8 +29,14 @@ Lower wick => (Candle bottom - low) / atr_14\
 15-period EMA => ln(C / EMA)\
 50-period EMA\
 100-period EMA
-EMA cross => ln(ema15 / ema50)\
-ADX direction => (plusDI - minusDI) * (ADX / 100)\
+EMA cross => ln(ema12 / ema26)\
+ADX\
+DI diff => plusDI - minusDI\
+**UltimateSmoother EMA:**\
+14-period UltimateSmoother => ln(C / Smoothed)\
+35-period UltimateSmoother\
+Smooth cross => ln(smooth8 / smooth18)\
+*Applied John Ehler's UltimateSmoother on the close series*\
 **Momentum:**\
 14-period RSI (smoothed C)\
 12/26/9-period MACD histogram => ((ema12 - ema26) - signal) / C\
@@ -51,11 +54,9 @@ Bollinger band position => (C - lowerband) / (upperband - lowerband)\
 ## MODEL EVALUATION
 **Explanation of metrics:**\
 Negative = 0, Flat = 1, Positive = 2\
-Accuracy (0-100) => (Correct predictions / Total predictions) * 100%\
-Cost score (0-1) => Cost-weighted score (penalises wrong-direction predictions more)\
 F1 score (0-1) => Harmonic mean of Precision and Recall\
 F1 score (macro-averaged) => Unweighted mean of F1 score calculated for each class (1 and 0)\
-Loss score => Cost-weighted cross-entropy loss (penalises wrong-direction predictions more)\
+Loss score => Cross-entropy loss\
 ROC-AUC score (0-1) => Probability that a randomly chosen 1 is ranked higher than a randomly chosen 0 by the model\
 Precision (0-1) => Correctly predicted 1's / All predicted 1's\
 Recall (0-1) => Correctly predicted 1's / All real 1's\

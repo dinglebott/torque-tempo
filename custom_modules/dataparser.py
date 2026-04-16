@@ -5,11 +5,11 @@ import json
 import pandas as pd
 import numpy as np
 
-def ultimateSmoother(series, period=4):
+def ultSmoother(series, period=10):
     values = series.values.astype(float)
     result = np.zeros(len(values))
     # coefficients
-    f = (1.41421 * np.pi) / period
+    f = (1.41421356 * np.pi) / period
     a1 = np.exp(-f)
     c2 = 2 * a1 * np.cos(f)
     c3 = -(a1 ** 2)
@@ -26,7 +26,7 @@ def ultimateSmoother(series, period=4):
             + c2 * result[i-1] # feedback from previous output
             + c3 * result[i-2] # feedback from output 2 bars ago
         )
-    return result
+    return result[:len(series)]
 
 def parseData(jsonPath):
     # deserialise json data
@@ -47,13 +47,9 @@ def parseData(jsonPath):
             })
     df = pd.DataFrame(records)
 
-    # denoise
-    df["volume"] = ultimateSmoother(df["volume"])[:len(df)]
+    # denoise volume
+    df["volume"] = ultSmoother(df["volume"])
     df["volume"] = df["volume"].clip(lower=1e-10)
-    df["close_smooth"] = ultimateSmoother(df["close"])[:len(df)]
-    # smoothed features
-    df["smooth_return"] = np.log(df["close_smooth"] / df["close_smooth"].shift(1))
-    df["dist_smooth"] = np.log(df["close"] / df["close_smooth"])
     
     # ADD FEATURES
     # helper
@@ -89,8 +85,11 @@ def parseData(jsonPath):
     # EMAs
     df["dist_ema15"] = np.log(df["close"] / getEma(15))
     df["dist_ema50"] = np.log(df["close"] / getEma(50))
-    df["dist_ema100"] = np.log(df["close"] / getEma(100))
     df["ema_cross"] = np.log(getEma(12) / getEma(26))
+    # Smoother EMA replacements
+    df["dist_smooth14"] = np.log(df["close"] / ultSmoother(df["close"], 14))
+    df["dist_smooth35"] = np.log(df["close"] / ultSmoother(df["close"], 35))
+    df["smooth_cross"] = np.log(ultSmoother(df["close"], 8) / ultSmoother(df["close"], 18))
     # RSI
     def rsi(series, n=14):
         delta = series.diff()
@@ -134,15 +133,11 @@ def parseData(jsonPath):
     df["di_diff"] = plus_di - minus_di
     # Support/resistance detection
     def detectSwingPoints(close: pd.Series, n: int = 5) -> tuple[pd.Series, pd.Series]:
-        roll_max = close.rolling(window=2 * n + 1, center=True).max()
-        roll_min = close.rolling(window=2 * n + 1, center=True).min()
+        roll_max = close.rolling(window=2 * n + 1, center=False).max()
+        roll_min = close.rolling(window=2 * n + 1, center=False).min()
 
-        swing_highs = close.where(close == roll_max)
-        swing_lows  = close.where(close == roll_min)
-
-        # A swing at bar t is only confirmed n bars later
-        swing_highs = swing_highs.shift(n)
-        swing_lows  = swing_lows.shift(n)
+        swing_highs = close.shift(n).where(close.shift(n) == roll_max)
+        swing_lows  = close.shift(n).where(close.shift(n) == roll_min)
 
         return swing_highs, swing_lows
 

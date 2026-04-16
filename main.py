@@ -46,19 +46,23 @@ df = dataparser.addTarget(df, forecastHorizon, 10)
 
 # SELECT FEATURES
 featureList = [
-    "open_return", "high_return", "low_return", "close_return", "vol_return", "smooth_return", "dist_smooth",
+    "open_return", "high_return", "low_return", "close_return", "vol_return",
     "atr_14", "volatility_regime",
     "bb_width", "bb_position",
     "hl_spread", "oc_spread", "upper_wick", "lower_wick",
-    "dist_ema15", "dist_ema50", "dist_ema100", "ema_cross",
+    "dist_ema15", "dist_ema50", "ema_cross",
+    "dist_smooth14", "dist_smooth35", "smooth_cross",
     "rsi_14", "macd_hist", "vol_ratio", "vol_momentum", "adx", "di_diff",
     "dist_high", "dist_low", "fast_pct_R", "slow_pct_R"
 ]
 featureList = [
-    "smooth_return", "dist_smooth", "vol_return",
-    "bb_width", "atr_14", "volatility_regime", "vol_momentum",
-    "ema_cross", "bb_position", "adx", "di_diff",
-    "rsi_14", "fast_pct_R", "slow_pct_R", "dist_ema15", "dist_ema50"
+    "close_return", "vol_return",
+    "atr_14", "volatility_regime",
+    "bb_width", "bb_position",
+    "upper_wick", "lower_wick",
+    "dist_smooth14", "dist_smooth35", "smooth_cross",
+    "rsi_14", "vol_momentum", "adx", "di_diff",
+    "fast_pct_R", "slow_pct_R"
 ]
 
 # SPLIT DATA

@@ -11,7 +11,12 @@ Part 3: [money-meta](https://github.com/dinglebott/money-meta), ensembling model
 <br/>
 
 ## Outline of methodology
-There were few hyperparameters to be tuned, and most of the experimentation was done by varying the feature set, learning rate, scheduler, or the number of unfrozen transformer blocks.\
+There were few hyperparameters to be tuned, and most of the experimentation was done by varying the following:
+- Feature set
+- Learning rate, LR scheduler
+- No. of unfrozen transformer blocks
+- Class weights
+- Batch size, no. of epochs
 *See DOCS.md for detailed testing methodology*\
 <br/>
 
