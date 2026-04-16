@@ -5,7 +5,7 @@ import json
 import pandas as pd
 import numpy as np
 
-def ultimateSmoother(series, period=5):
+def ultimateSmoother(series, period=4):
     values = series.values.astype(float)
     result = np.zeros(len(values))
     # coefficients
@@ -90,7 +90,7 @@ def parseData(jsonPath):
     df["dist_ema15"] = np.log(df["close"] / getEma(15))
     df["dist_ema50"] = np.log(df["close"] / getEma(50))
     df["dist_ema100"] = np.log(df["close"] / getEma(100))
-    df["ema_cross"] = np.log(getEma(15) / getEma(50))
+    df["ema_cross"] = np.log(getEma(12) / getEma(26))
     # RSI
     def rsi(series, n=14):
         delta = series.diff()
@@ -108,7 +108,7 @@ def parseData(jsonPath):
     df["vol_ratio"] = df["volume"] / vol_sma30
     df["vol_momentum"] = df["vol_ratio"] - df["vol_ratio"].rolling(5).mean()
     # ADX, DIs
-    def adx(df, period=14):
+    def getAdx(df, period=14):
         high = df["high"]
         low = df["low"]
         # directional movement
@@ -130,9 +130,8 @@ def parseData(jsonPath):
 
         return plus_di, minus_di, adx_line
     
-    df["plus_di"], df["minus_di"], df["adx"] = adx(df, period=14)
-    df["di_diff"] = df["plus_di"] - df["minus_di"]
-    df["adx_direction"] = df["di_diff"] * df["adx"] / 100
+    plus_di, minus_di, df["adx"] = getAdx(df, period=14)
+    df["di_diff"] = plus_di - minus_di
     # Support/resistance detection
     def detectSwingPoints(close: pd.Series, n: int = 5) -> tuple[pd.Series, pd.Series]:
         roll_max = close.rolling(window=2 * n + 1, center=True).max()
@@ -205,6 +204,16 @@ def parseData(jsonPath):
     for lag in range(1, 5):
         df[f"close_lag{lag}"] = df["close_return"].shift(lag)
         df[f"vol_lag{lag}"] = df["vol_return"].shift(lag)
+
+    # Williams %R
+    fastHighest = df["high"].rolling(21).max()
+    fastLowest = df["low"].rolling(21).min()
+    slowHighest = df["high"].rolling(112).max()
+    slowLowest = df["low"].rolling(112).min()
+    fastR = (fastHighest - df["close"]) / (fastHighest - fastLowest) * -100
+    slowR = (slowHighest - df["close"]) / (slowHighest - slowLowest) * -100
+    df["fast_pct_R"] = fastR.ewm(span=7, adjust=False).mean() + 50
+    df["slow_pct_R"] = slowR.ewm(span=3, adjust=False).mean() + 50
 
     # drop empty rows and return
     df.dropna(inplace=True)

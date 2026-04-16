@@ -51,14 +51,14 @@ featureList = [
     "bb_width", "bb_position",
     "hl_spread", "oc_spread", "upper_wick", "lower_wick",
     "dist_ema15", "dist_ema50", "dist_ema100", "ema_cross",
-    "rsi_14", "macd_hist", "vol_ratio", "vol_momentum", "adx_direction",
-    "dist_high", "dist_low"
+    "rsi_14", "macd_hist", "vol_ratio", "vol_momentum", "adx", "di_diff",
+    "dist_high", "dist_low", "fast_pct_R", "slow_pct_R"
 ]
 featureList = [
-    "high_return", "low_return", "adx_direction", "ema_cross", "bb_position",
-    "macd_hist", "upper_wick", "lower_wick", "dist_high", "dist_low",
-    "dist_ema15", "dist_ema50", "rsi_14", "volatility_regime", "bb_width", "atr_14",
-    "vol_ratio", "smooth_return", "dist_smooth"
+    "smooth_return", "dist_smooth", "vol_return",
+    "bb_width", "atr_14", "volatility_regime", "vol_momentum",
+    "ema_cross", "bb_position", "adx", "di_diff",
+    "rsi_14", "fast_pct_R", "slow_pct_R", "dist_ema15", "dist_ema50"
 ]
 
 # SPLIT DATA
