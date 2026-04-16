@@ -5,9 +5,11 @@ There are 3 model sizes available: `small`, `base`, and `large`. They have param
 The model is installed from pip, and the output head is fine-tuned on historical forex data.\
 *See DOCS.md for detailed results and workflow*\
 <br/>
+Check out the other parts of my forex prediction project!\
 Part 1: [trading-trees](https://github.com/dinglebott/trading-trees), using a tree-based architecture (XGBoost)\
 Part 2: [noisy-neurons](https://github.com/dinglebott/noisy-neurons), using neural networks (LSTM + CNN)\
-Part 3: [money-meta](https://github.com/dinglebott/money-meta), ensembling models from parts 1 and 2\
+Part 3: [money-meta](https://github.com/dinglebott/money-meta), deploying models from #1 and #2 to a website\
+Part 5: [kronos-fx](https://github.com/dinglebott/kronos-fx), further research with Kronos foundation model\
 <br/>
 
 ## Outline of methodology
